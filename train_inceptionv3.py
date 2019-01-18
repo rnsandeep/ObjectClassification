@@ -212,17 +212,6 @@ num_ftrs = model_ft.fc.in_features
 model_ft.fc = nn.Linear(num_ftrs,num_classes)
 
 model_ft = model_ft.to(device)
-#class1 = 1631.0+2991.0
-#class2 = 3461.0
-class_no = 4494.0
-class_yes = 1033.0*2
-#total = class1+class2
-w = np.array([class_no, class_yes])
-w = w*1.0/np.sum(w)
-class_weights = 1/torch.FloatTensor(w).to(device)
-print(class_weights)
-criterion = nn.CrossEntropyLoss() #weight=class_weights)
-
 
 # Observe that all parameters are being optimized
 optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
