@@ -51,8 +51,8 @@ mean_file =  sys.argv[3]
 
 #mean_std = np.load(mean_file)
 
-mean = torch.tensor([0.4616, 0.4006, 0.3602])
-std = torch.tensor([0.2287, 0.2160, 0.2085])
+mean = torch.tensor([0.485, 0.456, 0.406]) #[0.4616, 0.4006, 0.3602])
+std = torch.tensor([0.229, 0.224, 0.225]) #[0.2287, 0.2160, 0.2085])
 #mean = list(mean_std[0].data.cpu().numpy())
 #std = list(mean_std[1].data.cpu().numpy())
 

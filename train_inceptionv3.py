@@ -38,9 +38,9 @@ import sys, shutil
 
 
 def datatransforms(mean_file, crop_size):
-    mean_std = np.load(mean_file)
-    mean = list(mean_std[0].data.cpu().numpy())
-    std = list(mean_std[1].data.cpu().numpy())
+#`    mean_std = np.load(mean_file)
+    mean = [0.485, 0.456, 0.406] #list(mean_std[0].data.cpu().numpy())
+    std = [0.229, 0.224, 0.225] #list(mean_std[1].data.cpu().numpy())
     print("mean and standard deviation:",mean,std)
     data_transforms = {
       'train': transforms.Compose([
@@ -79,11 +79,11 @@ if not  os.path.exists(output_dir):
 
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
-                  for x in ['train', 'val', 'test']}
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=16,
+                  for x in ['train']} #, 'val', 'test']}
+dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=32,
                                              shuffle=True, num_workers=4)
-              for x in ['train', 'val', 'test']}
-dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val', 'test']}
+              for x in ['train']} #, 'val', 'test']}
+dataset_sizes = {x: len(image_datasets[x]) for x in ['train']} #, 'val', 'test']}
 class_names = image_datasets['train'].classes
 #print(image_datasets['train'].classes
 
@@ -142,7 +142,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs):
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
-                w = torch.FloatTensor([torch.sum(labels==0), torch.sum(labels==1)])
+                cls_nums = [torch.sum(labels==i) for i in range(len(class_names))]
+                w = torch.FloatTensor(cls_nums)
                 w = w/torch.sum(w)
                 class_weights = 1/torch.FloatTensor(w).to(device)
  
@@ -226,7 +227,7 @@ exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 # It should take around 15-25 min on CPU. On GPU though, it takes less than a
 # minute.
 #
-
+criterion = ''
 model_ft, best_acc, epoch = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
                        num_epochs=no_of_epochs)
 

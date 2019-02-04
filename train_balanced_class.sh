@@ -1,16 +1,12 @@
 
 epoch=20
-classes=2
-dataset='../darkcircle_gpu2/Dataset1'
-dataset2='../darkcircle_gpu2/Dataset2/puffyEyes'
+classes=6
+dataset='/home/user/Data/Backup/IMAGES-DATA/HIGHER/new'
 
-exp='puffyBalanced'
+exp='exp1'
 meanfile='mean_std_darkcircle.npy'
 
-python train_inceptionv3.py $dataset2 $exp mean_std_darkcircle.npy 299 2 $epoch
-
-#python train_inception_load.py ../darkcircle_gpu2/Dataset1 pretrained_exp6 mean_std_darkcircle.npy 299 2 20 pretrained_exp/49_checkpoint.pth.tar
-
+python train_inceptionv3.py $dataset $exp mean_std_darkcircle.npy 299 $classes $epoch
 
 max=$epoch
 max_size=320
@@ -20,7 +16,7 @@ do
    do	   
        f="_checkpoint.pth.tar"
        echo "epoch: ", $i, "resize_size: ", $j 
-       python test_inceptionv3.py $dataset2 $exp/$i$f $meanfile 299 $j $classes out_$exp
+       python test_inceptionv3.py $dataset $exp/$i$f $meanfile 299 $j $classes out_$exp
    done    
 done
 
