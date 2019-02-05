@@ -81,7 +81,7 @@ image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
                   for x in ['train', 'val', 'test']}
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=16,
-                                             shuffle=True, num_workers=4)
+                                             shuffle=True, num_workers=16)
               for x in ['train', 'val', 'test']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val', 'test']}
 class_names = image_datasets['train'].classes
@@ -154,10 +154,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs):
                     else:
                        outputs = model(inputs)
                     _, preds = torch.max(outputs, 1)
-#                    print(class_weights)
                     loss = nn.CrossEntropyLoss(weight=class_weights)(outputs, labels)
 #                    loss = criterion(outputs, labels, weight=class_weights)
-
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
@@ -227,6 +225,7 @@ exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 # minute.
 #
 
+criterion = ''
 model_ft, best_acc, epoch = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
                        num_epochs=no_of_epochs)
 

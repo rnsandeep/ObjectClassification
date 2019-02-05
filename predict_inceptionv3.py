@@ -14,8 +14,14 @@ from PIL import Image
 import copy, cv2
 import sys, shutil, pickle
 from sklearn.metrics import classification_report, confusion_matrix
+from os import listdir
+from os.path import isfile, join
 
-data_dir = sys.argv[1]
+
+mypath = sys.argv[1]
+
+images = [os.path.join(mypath, f) for f in listdir(mypath) if isfile(join(mypath, f))]
+
 
 mean_file =  sys.argv[3]
 
@@ -32,7 +38,7 @@ data_transform = transforms.Compose([
         transforms.Normalize(mean, std)
       ])
 
-device = "cpu"
+device =  torch.device("cuda:0" if torch.cuda.is_available() else "cpu") #"cpu"
 print("device found:", device)
 
 def load_model(path):
@@ -61,16 +67,32 @@ def cv2_to_pil(img):
         im_pil = Image.fromarray(img)
         return im_pil
 
-def eval_model(model):
+def eval_model(model, image):
     model.eval()   # Set model to evaluate mode
-    inputs = np.zeros((299, 299, 3), np.uint8)
+    inputs = image #np.zeros((299, 299, 3), np.uint8)
     inputs = cv2_to_pil(inputs)
     inputs = data_transform(inputs)
     image_shape = inputs.size()
     inputs = inputs.reshape((1, 3, image_shape[1], image_shape[2])).to(device)
+    #with torch.no_grad():
     outputs = model(inputs)
-    return outputs
+    classes = ['NO-PIGMENTATION', 'PIGMENTATION']
+    cls =  torch.argmax(outputs).item()
+#    print(classes[cls])
+    return classes[cls]
 
+def eval_all(images, model):
+    cls_dict = dict()
+    for image in images:
+        try:  
+          image_np = cv2.imread(image)
+          cls_predict = eval_model(model, image_np)
+          cls_dict[image] = cls_predict
+          print(image, cls_predict)
+        except Exception as ex:
+            print("reading failed for :", image)
+    return cls_dict    
+        
     
 def load_inception_model(model_path, num_classes):
     model_ft = models.inception_v3(pretrained=True)
@@ -84,6 +106,17 @@ def load_inception_model(model_path, num_classes):
     return model
 
 
+def copyImages(cls_dict,output_dir):
+    for key in cls_dict:
+        output_path = os.path.join(output_dir, cls_dict[key])
+        print(output_path)
+        if not os.path.exists(output_path):
+             os.makedirs(output_path)
+             shutil.copy(key, output_path)
+        else:
+              shutil.copy(key, output_path)
+
+
 if __name__=="__main__":
     model_path = sys.argv[2]
     num_classes = int(sys.argv[6])
@@ -93,9 +126,10 @@ if __name__=="__main__":
     print(model_path)
     model = load_inception_model(model_path, num_classes)    
     since = time.time()
-    output = eval_model(model)
-    print(output)
+    cls_dict = eval_all(images, model)
+              
     last = time.time()
     total_time = last-since
-    print("total time taken to process;", total_time, "per image:", total_time*1.0/len(output))
+    print("total time taken to process;", total_time, "per image:", total_time*1.0/len(cls_dict.keys()))
+    copyImages(cls_dict, output_dir)
     #pickle.dump([accuracy, label, output],open(os.path.join(output_dir, os.path.basename(model_path)[:-8]+'_'+str(crop_size)+'_'+str(resize_size)+'_accuracy.pkl'),'wb'))
