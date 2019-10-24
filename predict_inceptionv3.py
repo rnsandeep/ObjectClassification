@@ -16,7 +16,9 @@ import sys, shutil, pickle
 from sklearn.metrics import classification_report, confusion_matrix
 from os import listdir
 from os.path import isfile, join
-
+import torch.nn.functional as F
+import scipy.ndimage
+import matplotlib.pyplot as plt
 
 mypath = sys.argv[1]
 
@@ -25,8 +27,8 @@ images = [os.path.join(mypath, f) for f in listdir(mypath) if isfile(join(mypath
 
 mean_file =  sys.argv[3]
 
-mean = torch.tensor([0.4616, 0.4006, 0.3602])
-std = torch.tensor([0.2287, 0.2160, 0.2085])
+mean = [0.4616, 0.4006, 0.3602]
+std = [0.2287, 0.2160, 0.2085]
 
 crop_size = int(sys.argv[4])
 
@@ -46,7 +48,7 @@ def load_model(path):
     return model
 
 def load_inputs_outputs(dataloaders):
-    phase = 'test'
+    phase = 'val'
     for inputs, labels in dataloaders[phase]:
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -74,22 +76,38 @@ def eval_model(model, image):
     inputs = data_transform(inputs)
     image_shape = inputs.size()
     inputs = inputs.reshape((1, 3, image_shape[1], image_shape[2])).to(device)
-    #with torch.no_grad():
-    outputs = model(inputs)
-    classes = ['NO-PIGMENTATION', 'PIGMENTATION']
+    with torch.no_grad():
+       outputs, cam, flatten = model(inputs)
+    outputs = F.softmax(outputs, dim=1)
+    classes = ['NO-NOSE-PIGM','NOSE-PIGM']
     cls =  torch.argmax(outputs).item()
+    print(cls)
 #    print(classes[cls])
-    return classes[cls]
+    return classes[cls], cam, flatten, cls
 
-def eval_all(images, model):
+def eval_all(images, model, flatten_weights):
     cls_dict = dict()
     for image in images:
         try:  
           image_np = cv2.imread(image)
-          cls_predict = eval_model(model, image_np)
+          cls_predict, cam , flatten, cls = eval_model(model, image_np)
+
+          cam  = torch.squeeze(cam).permute(1,2,0)
+          cam = convert_to_numpy(cam)
+          fw = flatten_weights.data.cpu().numpy()[cls]
+          mat_for_mult = scipy.ndimage.zoom(cam, (32, 32, 1), order=1)
+          final_output = np.dot(mat_for_mult.reshape((256*256, 2048)), fw).reshape(256,256)
+
+          image_256 = cv2.resize(image_np, (256,256))
+
+          plt.imshow(image_256, alpha=0.5)
+          plt.imshow(final_output, cmap='jet', alpha=0.5)
+          plt.colorbar()
+          plt.savefig("folder/"+ os.path.basename(image))
+          plt.close()
           cls_dict[image] = cls_predict
-          print(image, cls_predict)
         except Exception as ex:
+            print(ex)
             print("reading failed for :", image)
     return cls_dict    
         
@@ -99,17 +117,19 @@ def load_inception_model(model_path, num_classes):
     num_ftrs = model_ft.AuxLogits.fc.in_features
     model_ft.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
     num_ftrs = model_ft.fc.in_features
+   
     model_ft.fc = nn.Linear(num_ftrs,num_classes)
     model = model_ft.to(device)
     checkpoint = load_model(model_path)
     model.load_state_dict(checkpoint['state_dict'])
-    return model
+    flatten_weights = model.fc.weight
+    return model, flatten_weights
 
 
 def copyImages(cls_dict,output_dir):
     for key in cls_dict:
         output_path = os.path.join(output_dir, cls_dict[key])
-        print(output_path)
+#        print(output_path)
         if not os.path.exists(output_path):
              os.makedirs(output_path)
              shutil.copy(key, output_path)
@@ -124,9 +144,16 @@ if __name__=="__main__":
     if not  os.path.exists(output_dir):
         os.makedirs(output_dir)
     print(model_path)
-    model = load_inception_model(model_path, num_classes)    
+    model, flatten_weights = load_inception_model(model_path, num_classes)    
+    print(flatten_weights.shape)
+
     since = time.time()
-    cls_dict = eval_all(images, model)
+    cls_dict = eval_all(images, model, flatten_weights)
+    count  = 0
+    for image in cls_dict:
+        if cls_dict[image] == 'NOSE-PIGM':
+            count = count +1
+    print(count, len(cls_dict.keys()))
               
     last = time.time()
     total_time = last-since
